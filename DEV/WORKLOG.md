@@ -57,3 +57,9 @@
 - **Integração com Typebot**:
   - Adicionado aplicativo nativo Typebot em `config/integration/apps.yml`.
   - Adicionadas traduções completas em `en.yml` e `pt_BR.yml`.
+
+### 5. Fase 5: GitHub Actions Cloud Docker Build
+- Configurado workflow `.github/workflows/build-fluow-docker.yml` para compilação automatizada na nuvem do GitHub Actions.
+- O GitHub constrói a imagem Docker (com suporte a Buildx e cache de camadas) e publica no GitHub Container Registry (`ghcr.io/fluowai/chatwoot:latest`).
+- Desativados gatilhos com push das actions antigas da upstream (`publish_ee_docker.yml` e `publish_foss_docker.yml`), mantendo apenas acionamento manual.
+- Repositório local atualizado e pronto para sincronização com `https://github.com/fluowai/chatwoot.git`.
