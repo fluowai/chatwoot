@@ -44,9 +44,15 @@ class AccountBuilder
   end
 
   def create_account
+    default_locale = (@locale.presence || ENV.fetch('DEFAULT_LOCALE', 'pt_BR')).to_s.tr('-', '_')
+    available = LANGUAGES_CONFIG.values.pluck(:iso_639_1_code)
+    resolved_locale = available.include?(default_locale) ? default_locale : I18n.locale.to_s
+    default_timezone = ENV.fetch('DEFAULT_TIMEZONE', 'America/Sao_Paulo')
+
     @account = Account.create!(
       name: account_name,
-      locale: I18n.locale,
+      locale: resolved_locale,
+      reporting_timezone: ActiveSupport::TimeZone[default_timezone].present? ? default_timezone : nil,
       custom_attributes: { 'onboarding_step' => 'account_details' }
     )
     Current.account = @account

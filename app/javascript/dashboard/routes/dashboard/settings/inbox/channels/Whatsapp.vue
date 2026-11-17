@@ -80,9 +80,8 @@ const shouldShowEmbeddedSignupAccessRequest = computed(() => {
 const availableProviders = computed(() => [
   {
     key: PROVIDER_TYPES.EVOLUTION,
-    title: 'WhatsApp Não Oficial (Evolution / Baileys / Whatsmeow)',
-    description:
-      'Conecte qualquer número via QR Code ou Pairing Code sem janela de 24 horas e sem taxas por mensagem da Meta.',
+    title: t('BRAZIL_WHATSAPP.PROVIDER_CARD_TITLE'),
+    description: t('BRAZIL_WHATSAPP.PROVIDER_CARD_DESC'),
     icon: 'i-woot-whatsapp',
   },
   {

@@ -19,7 +19,7 @@ ENV RAILS_SERVE_STATIC_FILES ${RAILS_SERVE_STATIC_FILES}
 ARG RAILS_ENV=production
 ENV RAILS_ENV ${RAILS_ENV}
 
-ARG NODE_OPTIONS="--max-old-space-size=4096 --openssl-legacy-provider"
+ARG NODE_OPTIONS="--max-old-space-size=6144 --openssl-legacy-provider"
 ENV NODE_OPTIONS ${NODE_OPTIONS}
 
 ENV BUNDLE_PATH="/gems"
@@ -149,6 +149,15 @@ COPY --from=pre-builder /app /app
 
 # Copy .git_sha file from pre-builder stage
 COPY --from=pre-builder /app/.git_sha /app/.git_sha
+
+# Normalize shell entrypoints to LF and bake Enterprise Brazil defaults
+RUN sed -i 's/\r$//' /app/docker/entrypoints/*.sh /app/docker/entrypoints/helpers/* 2>/dev/null || true \
+  && chmod +x /app/docker/entrypoints/*.sh
+
+ENV CW_EDITION="ee"
+ENV DEFAULT_LOCALE="pt_BR"
+ENV DEFAULT_TIMEZONE="America/Sao_Paulo"
+ENV TZ="America/Sao_Paulo"
 
 WORKDIR /app
 

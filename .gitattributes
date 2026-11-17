@@ -1,0 +1,26 @@
+* text=auto eol=lf
+*.sh text eol=lf
+*.rb text eol=lf
+*.rake text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.vue text eol=lf
+*.json text eol=lf
+*.css text eol=lf
+*.scss text eol=lf
+*.erb text eol=lf
+*.md text eol=lf
+Dockerfile* text eol=lf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.mp3 binary
+*.ogg binary
+*.wav binary

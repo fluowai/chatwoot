@@ -63,3 +63,36 @@
 - O GitHub constrói a imagem Docker (com suporte a Buildx e cache de camadas) e publica no GitHub Container Registry (`ghcr.io/fluowai/chatwoot:latest`).
 - Desativados gatilhos com push das actions antigas da upstream (`publish_ee_docker.yml` e `publish_foss_docker.yml`), mantendo apenas acionamento manual.
 - Repositório local atualizado e pronto para sincronização com `https://github.com/fluowai/chatwoot.git`.
+
+## [2026-11-17] Nacionalização 100% Brasil, Correções Críticas de Produção, Testes e Stack Portainer
+
+### 1. Correções Críticas de Bugs e Lacunas Encontradas na Auditoria
+- **Proteção contra CRLF em Containers Linux (`.gitattributes` + `docker/Dockerfile`)**:
+  - Adicionado `.gitattributes` forçando `eol=lf` e higienização `sed -i 's/\r$//'` em `docker/Dockerfile` para evitar falha `exec docker/entrypoints/rails.sh: no such file or directory` no Portainer.
+- **Desbloqueio Enterprise desde o Boot Zero (`config/installation_config.yml` + `lib/chatwoot_app.rb`)**:
+  - Alterado `INSTALLATION_PRICING_PLAN` padrão de `'community'` para `'enterprise'` e `INSTALLATION_PRICING_PLAN_QUANTITY` para `999999`, além de `DISABLE_META_INBOX_CREATION: false` e `DISABLE_META_MESSAGE_SENDING: false`.
+  - Adicionadas chaves editáveis no Super Admin para `GROQ_API_KEY`, `EVOLUTION_API_HOST`, `EVOLUTION_API_KEY`, `PIX_DEFAULT_KEY`, `PIX_MERCHANT_NAME` e `PIX_MERCHANT_CITY`.
+- **Recebimento Bidirecional de Webhooks WhatsApp Não Oficial**:
+  - Criados `Whatsapp::UnofficialChannelFinderService` e `Whatsapp::IncomingMessageUnofficialService`, conectados a `Webhooks::WhatsappController` e `Webhooks::WhatsappEventsJob`.
+  - Suporte completo a Evolution API (v1/v2), Baileys e Whatsmeow: texto, áudio, imagem, vídeo, documento, localização, descriptografia Base64, resolução de `@lid`, sincronização de mensagens enviadas pelo celular (`fromMe`), resposta citada (`in_reply_to`) e atualização de status (`delivered`/`read`/`failed`).
+  - Protegido `Channel::Whatsapp#teardown_webhooks` (`unless: :unofficial_provider?`) e adicionada configuração automática de webhook na criação do canal.
+- ** Correção de Áudio OGG/Opus no Navegador (`ReplyBox.vue`)**:
+  - Habilitado `AUDIO_FORMATS.OGG` para `evolution`, `baileys` e `whatsmeow` (antes gravava em MP3), garantindo nota de voz PTT nativa no iOS e Android.
+- **Correção Crítica do Payload PIX BACEN (`PixService` + `brazilHelpers.js`)**:
+  - Corrigida sanitização do campo `txid` que removia os asteriscos de `'***'` (gerando `62040500` rejeitado pelos bancos brasileiros). Agora preserva `'***'` ou sanitiza alfanumérico sem espaços conforme especificação oficial EMV BR Code do Banco Central.
+
+### 2. Novas Funcionalidades Brasileiras de Ponta a Ponta
+- **Modal de Cobrança PIX no Chat (`PixChargeModal.vue` + `ReplyBottomPanel.vue` + `ReplyBox.vue`)**:
+  - Geração instantânea de QR Code oficial e código PIX Copia e Cola direto na barra de resposta da conversa, com opção de enviar mensagem formatada + imagem PNG do QR Code em 1 clique.
+- **Utilitários Brasil: CPF/CNPJ e ViaCEP (`BrazilQuickToolsModal.vue` + `Brazil::DocumentValidator` + `Api::V1::Accounts::BrazilToolsController`)**:
+  - Validação real de dígitos verificadores Mod-11 de CPF e CNPJ, busca de endereço por CEP via ViaCEP, inserção rápida na conversa e gravação direta nos `custom_attributes` do contato.
+- **Kanban CRM Drag-and-Drop (`KanbanView.vue`)**:
+  - Reescrito em Vue 3 `<script setup>` com `vuedraggable`, filtro por canal e busca textual, valor do negócio em Reais (`R$`) editável no card, soma financeira por coluna e criação automática das etiquetas do funil.
+- **Conexão WhatsApp com QR Code ao Vivo (`EvolutionWhatsapp.vue`)**:
+  - Reescrito em `<script setup>` com seleção de motor (`evolution`, `baileys`, `whatsmeow`), normalização automática do 9º dígito, cópia da URL de Webhook e leitura de QR Code / Pairing Code na própria tela.
+- **Internacionalização Completa (`pt_BR/brazil.json` e `en/brazil.json`)**:
+  - Idioma padrão `pt_BR` e fuso `America/Sao_Paulo` em `SwitchLocale` e `AccountBuilder`. Zero textos hardcoded nos templates Vue.
+
+### 3. Infraestrutura Docker & Portainer Self-Hosted
+- Criado `docker-compose.portainer.yaml` (stack completa com PostgreSQL `pgvector:pg16`, Redis 7, Chatwoot Rails com `AUTO_MIGRATE=true`, Sidekiq e Evolution API integrada sem dependência de arquivo `.env` em disco).
+- Atualizados `docker/entrypoints/rails.sh`, `docker-compose.production.yaml`, `.env.brazil.example` e guia `DEV/DEPLOY_PORTAINER_BRASIL.md`.

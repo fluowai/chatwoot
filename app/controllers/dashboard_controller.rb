@@ -29,6 +29,9 @@ class DashboardController < ActionController::Base
     INSTALLATION_PRICING_PLAN
     CAPTAIN_TOOLS_MANIFEST_ENABLED
     CAPTAIN_TOOLS_CATALOG_URL
+    PIX_DEFAULT_KEY
+    PIX_MERCHANT_NAME
+    PIX_MERCHANT_CITY
   ].freeze
 
   before_action :set_application_pack

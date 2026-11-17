@@ -276,13 +276,13 @@
 
 # ------- Chatwoot Internal Config for Cloud ----#
 - name: DISABLE_META_INBOX_CREATION
-  value: true
+  value: false
   display_title: 'Disable Meta Inbox Creation'
   description: 'Disable Facebook, Instagram, and WhatsApp Embedded Signup inbox creation on Chatwoot Cloud during Meta incidents'
   locked: false
   type: boolean
 - name: DISABLE_META_MESSAGE_SENDING
-  value: true
+  value: false
   display_title: 'Disable Meta Message Sending'
   description: 'Disable Instagram message sending on Chatwoot Cloud during Meta incidents'
   locked: false
@@ -376,10 +376,10 @@
 
 # ------- Chatwoot Internal Config for Self Hosted ----#
 - name: INSTALLATION_PRICING_PLAN
-  value: 'community'
+  value: 'enterprise'
   description: 'The pricing plan for the installation, retrieved from the billing API'
 - name: INSTALLATION_PRICING_PLAN_QUANTITY
-  value: 0
+  value: 999999
   description: 'The number of licenses purchased for the installation, retrieved from the billing API'
 - name: CHATWOOT_SUPPORT_WEBSITE_TOKEN
   value:
@@ -713,3 +713,38 @@
   value: 'production'
   locked: false
 ## ---- End of mobile incoming-call push ---- ##
+
+## ------ Edicao Brasil (WhatsApp, PIX e IA) ------ ##
+- name: GROQ_API_KEY
+  display_title: 'Groq API Key (Transcricao de Audio Whisper)'
+  description: 'Chave da API Groq para transcricao ultra-rapida de audios de WhatsApp em Portugues (whisper-large-v3).'
+  value: ''
+  locked: false
+  type: secret
+- name: EVOLUTION_API_HOST
+  display_title: 'Evolution API Host URL'
+  description: 'URL padrao da instancia Evolution API (ex: http://evolution-api:8080).'
+  value: ''
+  locked: false
+- name: EVOLUTION_API_KEY
+  display_title: 'Evolution API Global Key'
+  description: 'Chave global de autenticacao da Evolution API.'
+  value: ''
+  locked: false
+  type: secret
+- name: PIX_DEFAULT_KEY
+  display_title: 'Chave PIX Padrao'
+  description: 'Chave PIX padrao da empresa (CPF, CNPJ, E-mail, Telefone +55 ou Chave Aleatoria).'
+  value: ''
+  locked: false
+- name: PIX_MERCHANT_NAME
+  display_title: 'Nome do Recebedor PIX'
+  description: 'Nome do beneficiario exibido no pagamento PIX (ate 25 caracteres).'
+  value: ''
+  locked: false
+- name: PIX_MERCHANT_CITY
+  display_title: 'Cidade do Recebedor PIX'
+  description: 'Cidade do beneficiario exibida no pagamento PIX (ate 15 caracteres, ex: SAO PAULO).'
+  value: 'SAO PAULO'
+  locked: false
+## ---- Fim Edicao Brasil ---- ##

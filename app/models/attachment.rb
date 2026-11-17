@@ -226,7 +226,7 @@ class Attachment < ApplicationRecord
   end
 
   def enqueue_audio_transcription_job
-    return unless ENV['OPENAI_API_KEY'].present? || ENV['GROQ_API_KEY'].present?
+    return unless AudioTranscriptionService.configured?
 
     AudioTranscriptionJob.perform_later(self)
   end

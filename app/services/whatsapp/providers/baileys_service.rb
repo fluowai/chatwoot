@@ -25,25 +25,57 @@ class Whatsapp::Providers::BaileysService < Whatsapp::Providers::BaseService
   end
 
   def error_message(response)
-    response.parsed_response['message'] || response.parsed_response['error'] || response.body
+    parsed = response.parsed_response
+    parsed.is_a?(Hash) ? (parsed['message'] || parsed['error'] || response.body) : response.body.to_s
+  end
+
+  def connection_status
+    url = "#{gateway_url}/sessions/#{ERB::Util.url_encode(session_id)}/status"
+    response = HTTParty.get(url, headers: headers, timeout: 10)
+    return { state: 'error', error: error_message(response) } unless response.success?
+
+    parsed = response.parsed_response.is_a?(Hash) ? response.parsed_response : {}
+    { state: parsed['status'] || parsed['state'] || 'open', instance: session_id }
+  rescue StandardError => e
+    { state: 'unreachable', error: e.message }
+  end
+
+  def fetch_qr_code
+    url = "#{gateway_url}/sessions/#{ERB::Util.url_encode(session_id)}/qr"
+    response = HTTParty.get(url, headers: headers, timeout: 15)
+    return { error: error_message(response) } unless response.success?
+
+    parsed = response.parsed_response.is_a?(Hash) ? response.parsed_response : {}
+    {
+      base64: parsed['qr'] || parsed['base64'],
+      code: parsed['code'],
+      pairing_code: parsed['pairingCode']
+    }.compact
+  rescue StandardError => e
+    { error: e.message }
   end
 
   private
 
   def gateway_url
-    whatsapp_channel.provider_config['gateway_url'] || ENV.fetch('BAILEYS_GATEWAY_URL', 'http://localhost:8082')
+    host = whatsapp_channel.provider_config['api_host'].presence ||
+           whatsapp_channel.provider_config['gateway_url'].presence ||
+           ENV.fetch('BAILEYS_GATEWAY_URL', 'http://localhost:8082')
+    host.chomp('/')
   end
 
   def auth_token
-    whatsapp_channel.provider_config['api_key'] || ENV.fetch('BAILEYS_AUTH_TOKEN', nil)
+    whatsapp_channel.provider_config['api_key'].presence || ENV.fetch('BAILEYS_AUTH_TOKEN', nil)
   end
 
   def session_id
-    whatsapp_channel.provider_config['session_id'] || whatsapp_channel.phone_number
+    whatsapp_channel.provider_config['instance_name'].presence ||
+      whatsapp_channel.provider_config['session_id'].presence ||
+      whatsapp_channel.phone_number.to_s.delete('+')
   end
 
   def normalize_number(number)
-    clean = number.to_s.delete('+')
+    clean = number.to_s.gsub(/\D/, '')
     normalizer = Whatsapp::PhoneNormalizers::BrazilPhoneNormalizer.new
     normalizer.handles_country?(clean) ? normalizer.normalize(clean) : clean
   end
@@ -55,15 +87,15 @@ class Whatsapp::Providers::BaileysService < Whatsapp::Providers::BaseService
   end
 
   def send_text_message(phone_number, message)
-    url = "#{gateway_url}/chats/send?session=#{session_id}"
+    url = "#{gateway_url}/chats/send?session=#{ERB::Util.url_encode(session_id)}"
     body = {
       receiver: "#{phone_number}@s.whatsapp.net",
       message: {
-        text: message.content
+        text: message.outgoing_content.presence || message.content.to_s
       }
     }
 
-    response = HTTParty.post(url, headers: headers, body: body.to_json)
+    response = HTTParty.post(url, headers: headers, body: body.to_json, timeout: 20)
     process_baileys_response(response, message)
   end
 
@@ -72,7 +104,7 @@ class Whatsapp::Providers::BaileysService < Whatsapp::Providers::BaseService
     return if attachment.blank?
 
     file_url = attachment.download_url
-    url = "#{gateway_url}/chats/send?session=#{session_id}"
+    url = "#{gateway_url}/chats/send?session=#{ERB::Util.url_encode(session_id)}"
 
     payload_message = if attachment.audio?
                         {
@@ -83,18 +115,18 @@ class Whatsapp::Providers::BaileysService < Whatsapp::Providers::BaseService
                       elsif attachment.image?
                         {
                           image: { url: file_url },
-                          caption: message.content.presence || ''
+                          caption: message.outgoing_content.presence || message.content.to_s
                         }
                       elsif attachment.video?
                         {
                           video: { url: file_url },
-                          caption: message.content.presence || ''
+                          caption: message.outgoing_content.presence || message.content.to_s
                         }
                       else
                         {
                           document: { url: file_url },
                           fileName: attachment.file.filename.to_s,
-                          mimetype: attachment.file_type
+                          mimetype: attachment.file.content_type
                         }
                       end
 
@@ -103,13 +135,13 @@ class Whatsapp::Providers::BaileysService < Whatsapp::Providers::BaseService
       message: payload_message
     }
 
-    response = HTTParty.post(url, headers: headers, body: body.to_json)
+    response = HTTParty.post(url, headers: headers, body: body.to_json, timeout: 30)
     process_baileys_response(response, message)
   end
 
   def process_baileys_response(response, message)
     if response.success?
-      parsed = response.parsed_response
+      parsed = response.parsed_response.is_a?(Hash) ? response.parsed_response : {}
       msg_id = parsed.dig('key', 'id') || parsed['id']
       message.update!(source_id: msg_id) if msg_id.present?
       msg_id
@@ -119,4 +151,3 @@ class Whatsapp::Providers::BaileysService < Whatsapp::Providers::BaseService
     end
   end
 end
-

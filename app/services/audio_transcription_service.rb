@@ -3,6 +3,18 @@
 class AudioTranscriptionService
   pattr_initialize [:attachment!]
 
+  def self.configured?
+    groq_api_key.present? || openai_api_key.present?
+  end
+
+  def self.groq_api_key
+    ENV['GROQ_API_KEY'].presence || GlobalConfigService.load('GROQ_API_KEY', nil).presence
+  end
+
+  def self.openai_api_key
+    ENV['OPENAI_API_KEY'].presence || GlobalConfigService.load('CAPTAIN_OPEN_AI_API_KEY', nil).presence
+  end
+
   def perform
     return if attachment.blank? || !attachment.audio?
     return if api_key.blank?
@@ -22,12 +34,16 @@ class AudioTranscriptionService
 
   private
 
+  def using_groq?
+    self.class.groq_api_key.present?
+  end
+
   def api_key
-    ENV.fetch('GROQ_API_KEY', nil) || ENV.fetch('OPENAI_API_KEY', nil)
+    self.class.groq_api_key || self.class.openai_api_key
   end
 
   def endpoint_url
-    if ENV['GROQ_API_KEY'].present?
+    if using_groq?
       'https://api.groq.com/openai/v1/audio/transcriptions'
     else
       'https://api.openai.com/v1/audio/transcriptions'
@@ -35,7 +51,7 @@ class AudioTranscriptionService
   end
 
   def model_name
-    if ENV['GROQ_API_KEY'].present?
+    if using_groq?
       'whisper-large-v3'
     else
       'whisper-1'
@@ -54,7 +70,8 @@ class AudioTranscriptionService
           model: model_name,
           language: 'pt',
           response_format: 'json'
-        }
+        },
+        timeout: 45
       )
 
       return response.parsed_response['text'] if response.success?
@@ -77,4 +94,3 @@ class AudioTranscriptionService
     )
   end
 end
-

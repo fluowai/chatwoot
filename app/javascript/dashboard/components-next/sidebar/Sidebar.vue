@@ -410,7 +410,7 @@ const menuItems = computed(() => {
         },
         {
           name: 'Kanban',
-          label: 'Kanban CRM',
+          label: t('BRAZIL_SIDEBAR.KANBAN_CRM'),
           icon: 'i-lucide-kanban',
           activeOn: ['kanban_dashboard'],
           to: accountScopedRoute('kanban_dashboard'),

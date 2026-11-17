@@ -86,8 +86,9 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
   end
 
   def handle_message_events(channel, params, locked_sender_id = nil)
-    case channel.provider
-    when 'whatsapp_cloud'
+    if channel.unofficial_provider?
+      Whatsapp::IncomingMessageUnofficialService.new(inbox: channel.inbox, params: params).perform
+    elsif channel.provider == 'whatsapp_cloud'
       service_params = { inbox: channel.inbox, params: params }
       service_params[:locked_sender_id] = locked_sender_id if locked_sender_id.present?
       Whatsapp::IncomingMessageWhatsappCloudService.new(**service_params).perform
@@ -159,9 +160,10 @@ class Webhooks::WhatsappEventsJob < MutexApplicationJob
   end
 
   def find_channel_by_url_param(params)
-    return unless params[:phone_number]
-
-    Channel::Whatsapp.find_by(phone_number: params[:phone_number])
+    Whatsapp::UnofficialChannelFinderService.new(
+      phone_number: params[:phone_number],
+      instance_name: params[:instance] || params[:session]
+    ).perform
   end
 
   def find_channel_from_whatsapp_business_payload(params)

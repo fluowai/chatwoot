@@ -13,8 +13,8 @@ module SwitchLocale
     # Use the locale from a custom domain if applicable
     locale ||= locale_from_custom_domain
 
-    # if locale is not set in account, let's use DEFAULT_LOCALE env variable
-    locale ||= ENV.fetch('DEFAULT_LOCALE', nil)
+    # if locale is not set in account, let's use DEFAULT_LOCALE env variable (defaults to pt_BR for Brazil edition)
+    locale ||= ENV.fetch('DEFAULT_LOCALE', 'pt_BR')
 
     set_locale(locale, &)
   end
@@ -59,11 +59,12 @@ module SwitchLocale
   def validate_and_get_locale(locale)
     return I18n.default_locale.to_s if locale.blank?
 
+    normalized_locale = locale.to_s.tr('-', '_')
     available_locales = I18n.available_locales.map(&:to_s)
-    locale_without_variant = locale.split('_')[0]
+    locale_without_variant = normalized_locale.split('_')[0]
 
-    if available_locales.include?(locale)
-      locale
+    if available_locales.include?(normalized_locale)
+      normalized_locale
     elsif available_locales.include?(locale_without_variant)
       locale_without_variant
     else

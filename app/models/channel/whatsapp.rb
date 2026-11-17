@@ -41,8 +41,9 @@ class Channel::Whatsapp < ApplicationRecord
 
   after_create :sync_templates, unless: :unofficial_provider?
   after_update_commit :log_credentials_transfer, if: :saved_change_to_provider_config?
-  before_destroy :teardown_webhooks
+  before_destroy :teardown_webhooks, unless: :unofficial_provider?
   after_commit :setup_webhooks, on: :create, if: :should_auto_setup_webhooks?
+  after_commit :setup_unofficial_webhook, on: :create, if: :unofficial_provider?
 
   def name
     'Whatsapp'
@@ -220,6 +221,14 @@ class Channel::Whatsapp < ApplicationRecord
     # responses can reflect the real result instead of swallowing callback errors.
     explicitly_configured_sources = %w[embedded_signup manual_setup_v2]
     provider == 'whatsapp_cloud' && explicitly_configured_sources.exclude?(provider_config['source'])
+  end
+
+  def setup_unofficial_webhook
+    return unless provider_service.respond_to?(:configure_webhook)
+
+    base_url = ENV.fetch('FRONTEND_URL', 'http://localhost:3000').chomp('/')
+    webhook_url = "#{base_url}/webhooks/whatsapp/#{ERB::Util.url_encode(phone_number)}"
+    provider_service.configure_webhook(webhook_url)
   end
 end
 

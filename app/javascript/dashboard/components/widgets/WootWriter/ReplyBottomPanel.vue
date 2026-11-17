@@ -129,6 +129,8 @@ export default {
     'selectWhatsappTemplate',
     'selectContentTemplate',
     'requestContactInfoTemplate',
+    'openPixModal',
+    'openBrazilToolsModal',
   ],
   setup(props) {
     const { setSignatureFlagForInbox, fetchSignatureFlagFromUISettings } =
@@ -373,6 +375,24 @@ export default {
           </h4>
         </div>
       </transition>
+      <NextButton
+        v-if="!isEditorDisabled && !isOnPrivateNote"
+        v-tooltip.top-end="$t('PIX_MODAL.TOOLTIP')"
+        icon="i-lucide-qr-code"
+        slate
+        faded
+        sm
+        @click="$emit('openPixModal')"
+      />
+      <NextButton
+        v-if="!isEditorDisabled"
+        v-tooltip.top-end="$t('BRAZIL_TOOLS.TOOLTIP')"
+        icon="i-lucide-id-card"
+        slate
+        faded
+        sm
+        @click="$emit('openBrazilToolsModal')"
+      />
       <NextButton
         v-if="enableInsertArticleInReply"
         v-tooltip.top-end="$t('HELP_CENTER.ARTICLE_SEARCH.OPEN_ARTICLE_SEARCH')"

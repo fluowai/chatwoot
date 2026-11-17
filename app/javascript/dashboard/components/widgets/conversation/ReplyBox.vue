@@ -51,6 +51,8 @@ import {
 import { useCopilotReply } from 'dashboard/composables/useCopilotReply';
 import { useMacroExecution } from 'dashboard/composables/useMacroExecution';
 import ConversationResolveAttributesModal from 'dashboard/components-next/ConversationWorkflow/ConversationResolveAttributesModal.vue';
+import PixChargeModal from './PixChargeModal.vue';
+import BrazilQuickToolsModal from './BrazilQuickToolsModal.vue';
 import { useKbd } from 'dashboard/composables/utils/useKbd';
 import { isFileTypeAllowedForChannel } from 'shared/helpers/FileHelper';
 import { isAIAssigneeType } from 'dashboard/helper/agentHelper';
@@ -85,6 +87,8 @@ export default {
     CopilotEditorSection,
     CopilotReplyBottomPanel,
     ConversationResolveAttributesModal,
+    PixChargeModal,
+    BrazilQuickToolsModal,
   },
   mixins: [inboxMixin, fileUploadMixin],
   emits: ['toggleEditorSize'],
@@ -196,6 +200,8 @@ export default {
       hasRecordedAudio: false,
       copilotAcceptedMessages: {},
       isQuoteRemoved: false,
+      showPixChargeModal: false,
+      showBrazilQuickToolsModal: false,
     };
   },
   computed: {
@@ -476,7 +482,10 @@ export default {
       return `draft-${this.conversationIdByRoute}-${this.effectiveReplyMode}`;
     },
     audioRecordFormat() {
-      if (this.isAWhatsAppCloudChannel) {
+      if (
+        this.isAWhatsAppCloudChannel ||
+        ['evolution', 'baileys', 'whatsmeow'].includes(this.inbox?.provider)
+      ) {
         return AUDIO_FORMATS.OGG;
       }
       if (this.isAWhatsAppChannel || this.isATelegramChannel) {
@@ -701,6 +710,22 @@ export default {
       );
 
       useTrack(CONVERSATION_EVENTS.INSERT_ARTICLE_LINK);
+    },
+    handleInsertBrazilContent(text) {
+      if (!text) return;
+      emitter.emit(BUS_EVENTS.INSERT_INTO_RICH_EDITOR, text);
+    },
+    handleSendPixWithQr({ message, qrFile }) {
+      const payload = {
+        conversationId: this.currentChat.id,
+        message,
+        private: false,
+        sender: this.sender,
+      };
+      if (qrFile) {
+        payload.files = [qrFile];
+      }
+      this.sendMessage(payload);
     },
     removeQuotedEmail() {
       this.isQuoteRemoved = true;
@@ -1573,8 +1598,25 @@ export default {
         @select-content-template="openContentTemplateModal"
         @toggle-insert-article="toggleInsertArticle"
         @request-contact-info-template="openContactInfoTemplateModal"
+        @open-pix-modal="showPixChargeModal = true"
+        @open-brazil-tools-modal="showBrazilQuickToolsModal = true"
       />
     </Transition>
+
+    <PixChargeModal
+      :show="showPixChargeModal"
+      :account-name="currentUser?.accounts?.[0]?.name || ''"
+      @close="showPixChargeModal = false"
+      @insert-message="handleInsertBrazilContent"
+      @send-pix-with-qr="handleSendPixWithQr"
+    />
+
+    <BrazilQuickToolsModal
+      :show="showBrazilQuickToolsModal"
+      :contact="currentContact"
+      @close="showBrazilQuickToolsModal = false"
+      @insert-message="handleInsertBrazilContent"
+    />
 
     <WhatsappTemplates
       :inbox-id="inbox.id"
