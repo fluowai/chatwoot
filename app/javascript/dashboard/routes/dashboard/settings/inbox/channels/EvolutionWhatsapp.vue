@@ -20,7 +20,9 @@ const { t } = useI18n();
 const providerEngine = ref('evolution');
 const inboxName = ref('');
 const phoneNumber = ref('');
-const apiHost = ref('http://evolution-api:8080');
+const apiHost = ref(
+  window.globalConfig?.EVOLUTION_API_HOST || 'http://chatwoot-evolution:8080'
+);
 const apiKey = ref('');
 const instanceName = ref('');
 const allowGroups = ref(false);

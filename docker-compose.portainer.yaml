@@ -1,204 +1,313 @@
-version: '3.8'
-
-# ==============================================================================
-# STACK PORTAINER OFICIAL - CHATWOOT ENTERPRISE BRASIL (FLUOW AI)
-# ==============================================================================
-# Como usar no Portainer:
-# 1. Acesse Portainer -> Stacks -> Add Stack -> Web Editor
-# 2. Cole o conteúdo deste arquivo
-# 3. Na seção "Environment variables" abaixo do editor, defina:
-#    - FRONTEND_URL=https://atendimento.seudominio.com.br
-#    - SECRET_KEY_BASE=(gere uma string hexadecimal longa de 64+ caracteres)
-#    - POSTGRES_PASSWORD=sua_senha_forte_postgres
-#    - REDIS_PASSWORD=sua_senha_forte_redis
-#    - EVOLUTION_API_KEY=sua_chave_global_evolution
-#    - GROQ_API_KEY=sua_chave_groq_opcional_para_transcrever_audios
-# 4. Clique em "Deploy the stack". O banco e o desbloqueio Enterprise rodam sozinhos!
-# ==============================================================================
+version: "3.8"
 
 services:
-  postgres:
+  chatwoot-postgres:
     image: pgvector/pgvector:pg16
-    restart: unless-stopped
+    environment:
+      POSTGRES_DB: "chatwoot_production"
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-WooTechChatwootPg2026Forte}"
+      TZ: "America/Sao_Paulo"
     volumes:
       - chatwoot_postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-chatwoot_production}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-TroqueEstaSenhaPostgresForte123}
-      TZ: America/Sao_Paulo
     networks:
-      - chatwoot_net
+      - chatwoot-internal
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-chatwoot_production}']
-      interval: 10s
+      test:
+        - CMD-SHELL
+        - "pg_isready -U postgres -d chatwoot_production"
+      interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 20s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+        reservations:
+          cpus: "0.10"
+          memory: 256M
 
-  redis:
+  chatwoot-redis:
     image: redis:7-alpine
-    restart: unless-stopped
-    command: ['sh', '-c', 'redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-TroqueEstaSenhaRedisForte123}"']
+    command:
+      - sh
+      - -c
+      - 'redis-server --appendonly yes --requirepass "${REDIS_PASSWORD:-WooTechChatwootRedis2026Forte}"'
+    environment:
+      TZ: "America/Sao_Paulo"
     volumes:
       - chatwoot_redis_data:/data
-    environment:
-      TZ: America/Sao_Paulo
     networks:
-      - chatwoot_net
+      - chatwoot-internal
     healthcheck:
-      test: ['CMD-SHELL', 'redis-cli -a "${REDIS_PASSWORD:-TroqueEstaSenhaRedisForte123}" ping | grep PONG']
-      interval: 10s
+      test:
+        - CMD-SHELL
+        - 'redis-cli -a "${REDIS_PASSWORD:-WooTechChatwootRedis2026Forte}" ping | grep PONG'
+      interval: 15s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.05"
+          memory: 64M
 
-  chatwoot-rails:
-    image: ${CHATWOOT_IMAGE:-ghcr.io/fluowai/chatwoot:latest}
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    ports:
-      - '${CHATWOOT_PORT:-3000}:3000'
+  chatwoot-web:
+    image: ghcr.io/fluowai/chatwoot:latest
+    entrypoint: docker/entrypoints/rails.sh
+    command:
+      - bundle
+      - exec
+      - rails
+      - s
+      - -p
+      - "3000"
+      - -b
+      - "0.0.0.0"
+    environment:
+      NODE_ENV: "production"
+      RAILS_ENV: "production"
+      INSTALLATION_ENV: "docker"
+      CW_EDITION: "ee"
+      AUTO_MIGRATE: "true"
+      DISABLE_TELEMETRY: "true"
+      RAILS_LOG_TO_STDOUT: "true"
+      RAILS_SERVE_STATIC_FILES: "true"
+
+      # Domínio e Idioma Padrão Brasil
+      FRONTEND_URL: "https://chatwoot.wootech.com.br"
+      FORCE_SSL: "true"
+      DEFAULT_LOCALE: "pt_BR"
+      DEFAULT_TIMEZONE: "America/Sao_Paulo"
+      TZ: "America/Sao_Paulo"
+      ENABLE_ACCOUNT_SIGNUP: "false"
+      SECRET_KEY_BASE: "${SECRET_KEY_BASE:-9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a0f1e2d3c4b5a69788}"
+
+      # Banco de Dados e Redis Internos da Stack
+      POSTGRES_HOST: "chatwoot-postgres"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DATABASE: "chatwoot_production"
+      POSTGRES_USERNAME: "postgres"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-WooTechChatwootPg2026Forte}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-WooTechChatwootRedis2026Forte}@chatwoot-redis:6379/0"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-WooTechChatwootRedis2026Forte}"
+
+      # Concorrência Puma
+      RAILS_MAX_THREADS: "5"
+      WEB_CONCURRENCY: "2"
+
+      # Storage (Local por padrão em volume compartilhado; para usar seu MinIO crie o bucket "chatwoot" e troque para s3_compatible)
+      ACTIVE_STORAGE_SERVICE: "${ACTIVE_STORAGE_SERVICE:-local}"
+      STORAGE_ENDPOINT: "https://mypanel.wootech.com.br"
+      STORAGE_REGION: "us-east-1"
+      STORAGE_ACCESS_KEY_ID: "${MINIO_ACCESS_KEY:-}"
+      STORAGE_SECRET_ACCESS_KEY: "${MINIO_SECRET_KEY:-}"
+      STORAGE_BUCKET_NAME: "${MINIO_BUCKET_NAME:-chatwoot}"
+      STORAGE_FORCE_PATH_STYLE: "true"
+
+      # E-mail (SMTP / Resend SMTP)
+      MAILER_SENDER_EMAIL: "Atendimento WooTech <nao-responda@chatwoot.wootech.com.br>"
+      SMTP_DOMAIN: "chatwoot.wootech.com.br"
+      SMTP_ADDRESS: "${SMTP_ADDRESS:-smtp.resend.com}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-resend}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_AUTHENTICATION: "plain"
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+
+      # Recursos Edição Brasil (WhatsApp Não Oficial, Transcrição Whisper IA e PIX)
+      EVOLUTION_API_HOST: "http://chatwoot-evolution:8080"
+      INTERNAL_WEBHOOK_URL: "http://chatwoot-web:3000"
+      EVOLUTION_API_KEY: "${EVOLUTION_API_KEY:-WooTechEvolutionKey2026}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      PIX_DEFAULT_KEY: "${PIX_DEFAULT_KEY:-}"
+      PIX_MERCHANT_NAME: "${PIX_MERCHANT_NAME:-WOOTECH}"
+      PIX_MERCHANT_CITY: "${PIX_MERCHANT_CITY:-SAO PAULO}"
+
     volumes:
       - chatwoot_storage_data:/app/storage
-    entrypoint: docker/entrypoints/rails.sh
-    command: ['bundle', 'exec', 'rails', 's', '-p', '3000', '-b', '0.0.0.0']
-    environment:
-      NODE_ENV: production
-      RAILS_ENV: production
-      INSTALLATION_ENV: docker
-      CW_EDITION: ee
-      AUTO_MIGRATE: 'true'
-      DISABLE_TELEMETRY: 'true'
-      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-pt_BR}
-      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-America/Sao_Paulo}
-      TZ: ${TZ:-America/Sao_Paulo}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      FORCE_SSL: ${FORCE_SSL:-false}
-      ENABLE_ACCOUNT_SIGNUP: ${ENABLE_ACCOUNT_SIGNUP:-false}
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-fluow_ai_brazil_enterprise_change_this_secret_key_base_in_production_2026}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: '5432'
-      POSTGRES_DATABASE: ${POSTGRES_DB:-chatwoot_production}
-      POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-TroqueEstaSenhaPostgresForte123}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-TroqueEstaSenhaRedisForte123}@redis:6379/0
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-TroqueEstaSenhaRedisForte123}
-      RAILS_MAX_THREADS: ${RAILS_MAX_THREADS:-5}
-      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
-      ACTIVE_STORAGE_SERVICE: ${ACTIVE_STORAGE_SERVICE:-local}
-      MAILER_SENDER_EMAIL: ${MAILER_SENDER_EMAIL:-Atendimento <nao-responda@seudominio.com.br>}
-      SMTP_ADDRESS: ${SMTP_ADDRESS:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_DOMAIN: ${SMTP_DOMAIN:-}
-      SMTP_AUTHENTICATION: ${SMTP_AUTHENTICATION:-login}
-      SMTP_ENABLE_STARTTLS_AUTO: ${SMTP_ENABLE_STARTTLS_AUTO:-true}
-      EVOLUTION_API_HOST: ${EVOLUTION_API_HOST:-http://evolution-api:8080}
-      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-FluowEvolutionGlobalKey123}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      PIX_DEFAULT_KEY: ${PIX_DEFAULT_KEY:-}
-      PIX_MERCHANT_NAME: ${PIX_MERCHANT_NAME:-}
-      PIX_MERCHANT_CITY: ${PIX_MERCHANT_CITY:-SAO PAULO}
+
     networks:
-      - chatwoot_net
+      - woo-network
+      - chatwoot-internal
+
     healthcheck:
-      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/health || exit 1']
+      test:
+        - CMD
+        - wget
+        - "--no-verbose"
+        - "--tries=1"
+        - "--spider"
+        - "http://127.0.0.1:3000/health"
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 90s
 
-  chatwoot-sidekiq:
-    image: ${CHATWOOT_IMAGE:-ghcr.io/fluowai/chatwoot:latest}
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      chatwoot-rails:
-        condition: service_started
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 2G
+        reservations:
+          cpus: "0.25"
+          memory: 512M
+
+      labels:
+        - "traefik.enable=true"
+        - "traefik.swarm.network=woo-network"
+
+        # Roteamento HTTPS Traefik para chatwoot.wootech.com.br
+        - "traefik.http.routers.woo-chatwoot.rule=Host(`chatwoot.wootech.com.br`)"
+        - "traefik.http.routers.woo-chatwoot.entrypoints=websecure"
+        - "traefik.http.routers.woo-chatwoot.tls=true"
+        - "traefik.http.routers.woo-chatwoot.tls.certresolver=letsencrypt"
+        - "traefik.http.routers.woo-chatwoot.service=woo-chatwoot"
+
+        - "traefik.http.services.woo-chatwoot.loadbalancer.server.port=3000"
+
+  chatwoot-worker:
+    image: ghcr.io/fluowai/chatwoot:latest
+    entrypoint: docker/entrypoints/rails.sh
+    command:
+      - bundle
+      - exec
+      - sidekiq
+      - -C
+      - config/sidekiq.yml
+    environment:
+      NODE_ENV: "production"
+      RAILS_ENV: "production"
+      INSTALLATION_ENV: "docker"
+      CW_EDITION: "ee"
+      AUTO_MIGRATE: "false"
+      DISABLE_TELEMETRY: "true"
+      RAILS_LOG_TO_STDOUT: "true"
+
+      FRONTEND_URL: "https://chatwoot.wootech.com.br"
+      FORCE_SSL: "true"
+      DEFAULT_LOCALE: "pt_BR"
+      DEFAULT_TIMEZONE: "America/Sao_Paulo"
+      TZ: "America/Sao_Paulo"
+      SECRET_KEY_BASE: "${SECRET_KEY_BASE:-9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c5b4a39281706f5e4d3c2b1a0f1e2d3c4b5a69788}"
+
+      POSTGRES_HOST: "chatwoot-postgres"
+      POSTGRES_PORT: "5432"
+      POSTGRES_DATABASE: "chatwoot_production"
+      POSTGRES_USERNAME: "postgres"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-WooTechChatwootPg2026Forte}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-WooTechChatwootRedis2026Forte}@chatwoot-redis:6379/0"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-WooTechChatwootRedis2026Forte}"
+
+      ACTIVE_STORAGE_SERVICE: "${ACTIVE_STORAGE_SERVICE:-local}"
+      STORAGE_ENDPOINT: "https://mypanel.wootech.com.br"
+      STORAGE_REGION: "us-east-1"
+      STORAGE_ACCESS_KEY_ID: "${MINIO_ACCESS_KEY:-}"
+      STORAGE_SECRET_ACCESS_KEY: "${MINIO_SECRET_KEY:-}"
+      STORAGE_BUCKET_NAME: "${MINIO_BUCKET_NAME:-chatwoot}"
+      STORAGE_FORCE_PATH_STYLE: "true"
+
+      MAILER_SENDER_EMAIL: "Atendimento WooTech <nao-responda@chatwoot.wootech.com.br>"
+      SMTP_DOMAIN: "chatwoot.wootech.com.br"
+      SMTP_ADDRESS: "${SMTP_ADDRESS:-smtp.resend.com}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USERNAME: "${SMTP_USERNAME:-resend}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_AUTHENTICATION: "plain"
+      SMTP_ENABLE_STARTTLS_AUTO: "true"
+
+      EVOLUTION_API_HOST: "http://chatwoot-evolution:8080"
+      INTERNAL_WEBHOOK_URL: "http://chatwoot-web:3000"
+      EVOLUTION_API_KEY: "${EVOLUTION_API_KEY:-WooTechEvolutionKey2026}"
+      GROQ_API_KEY: "${GROQ_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      PIX_DEFAULT_KEY: "${PIX_DEFAULT_KEY:-}"
+      PIX_MERCHANT_NAME: "${PIX_MERCHANT_NAME:-WOOTECH}"
+      PIX_MERCHANT_CITY: "${PIX_MERCHANT_CITY:-SAO PAULO}"
+
     volumes:
       - chatwoot_storage_data:/app/storage
-    entrypoint: docker/entrypoints/rails.sh
-    command: ['bundle', 'exec', 'sidekiq', '-C', 'config/sidekiq.yml']
-    environment:
-      NODE_ENV: production
-      RAILS_ENV: production
-      INSTALLATION_ENV: docker
-      CW_EDITION: ee
-      AUTO_MIGRATE: 'false'
-      DISABLE_TELEMETRY: 'true'
-      DEFAULT_LOCALE: ${DEFAULT_LOCALE:-pt_BR}
-      DEFAULT_TIMEZONE: ${DEFAULT_TIMEZONE:-America/Sao_Paulo}
-      TZ: ${TZ:-America/Sao_Paulo}
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      SECRET_KEY_BASE: ${SECRET_KEY_BASE:-fluow_ai_brazil_enterprise_change_this_secret_key_base_in_production_2026}
-      POSTGRES_HOST: postgres
-      POSTGRES_PORT: '5432'
-      POSTGRES_DATABASE: ${POSTGRES_DB:-chatwoot_production}
-      POSTGRES_USERNAME: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-TroqueEstaSenhaPostgresForte123}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-TroqueEstaSenhaRedisForte123}@redis:6379/0
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-TroqueEstaSenhaRedisForte123}
-      ACTIVE_STORAGE_SERVICE: ${ACTIVE_STORAGE_SERVICE:-local}
-      MAILER_SENDER_EMAIL: ${MAILER_SENDER_EMAIL:-Atendimento <nao-responda@seudominio.com.br>}
-      SMTP_ADDRESS: ${SMTP_ADDRESS:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USERNAME: ${SMTP_USERNAME:-}
-      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
-      SMTP_DOMAIN: ${SMTP_DOMAIN:-}
-      SMTP_AUTHENTICATION: ${SMTP_AUTHENTICATION:-login}
-      SMTP_ENABLE_STARTTLS_AUTO: ${SMTP_ENABLE_STARTTLS_AUTO:-true}
-      EVOLUTION_API_HOST: ${EVOLUTION_API_HOST:-http://evolution-api:8080}
-      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-FluowEvolutionGlobalKey123}
-      GROQ_API_KEY: ${GROQ_API_KEY:-}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-    networks:
-      - chatwoot_net
 
-  evolution-api:
-    image: ${EVOLUTION_IMAGE:-atendai/evolution-api:v2.2.3}
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    ports:
-      - '${EVOLUTION_PORT:-8080}:8080'
-    volumes:
-      - evolution_instances_data:/evolution/instances
-    environment:
-      SERVER_URL: ${EVOLUTION_PUBLIC_URL:-http://localhost:8080}
-      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY:-FluowEvolutionGlobalKey123}
-      DATABASE_ENABLED: 'true'
-      DATABASE_PROVIDER: postgresql
-      DATABASE_CONNECTION_URI: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-TroqueEstaSenhaPostgresForte123}@postgres:5432/${POSTGRES_DB:-chatwoot_production}?schema=evolution_api
-      DATABASE_SAVE_DATA_INSTANCE: 'true'
-      DATABASE_SAVE_DATA_NEW_MESSAGE: 'true'
-      DATABASE_SAVE_MESSAGE_UPDATE: 'true'
-      DATABASE_SAVE_DATA_CONTACTS: 'true'
-      DATABASE_SAVE_DATA_CHATS: 'true'
-      CACHE_REDIS_ENABLED: 'true'
-      CACHE_REDIS_URI: redis://:${REDIS_PASSWORD:-TroqueEstaSenhaRedisForte123}@redis:6379/1
-      CACHE_REDIS_PREFIX_KEY: evolution
-      DEL_INSTANCE: 'false'
-      TZ: America/Sao_Paulo
     networks:
-      - chatwoot_net
+      - woo-network
+      - chatwoot-internal
+
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1536M
+        reservations:
+          cpus: "0.15"
+          memory: 384M
+
+  chatwoot-evolution:
+    image: atendai/evolution-api:v2.2.3
+    environment:
+      SERVER_URL: "http://chatwoot-evolution:8080"
+      AUTHENTICATION_API_KEY: "${EVOLUTION_API_KEY:-WooTechEvolutionKey2026}"
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: "postgresql"
+      DATABASE_CONNECTION_URI: "postgresql://postgres:${POSTGRES_PASSWORD:-WooTechChatwootPg2026Forte}@chatwoot-postgres:5432/chatwoot_production?schema=evolution_api"
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      DATABASE_SAVE_DATA_CONTACTS: "true"
+      DATABASE_SAVE_DATA_CHATS: "true"
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: "redis://:${REDIS_PASSWORD:-WooTechChatwootRedis2026Forte}@chatwoot-redis:6379/1"
+      CACHE_REDIS_PREFIX_KEY: "evolution"
+      DEL_INSTANCE: "false"
+      TZ: "America/Sao_Paulo"
+    volumes:
+      - chatwoot_evolution_instances:/evolution/instances
+    networks:
+      - woo-network
+      - chatwoot-internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: 1G
+        reservations:
+          cpus: "0.10"
+          memory: 256M
 
 volumes:
-  chatwoot_storage_data:
   chatwoot_postgres_data:
   chatwoot_redis_data:
-  evolution_instances_data:
+  chatwoot_storage_data:
+  chatwoot_evolution_instances:
 
 networks:
-  chatwoot_net:
-    driver: bridge
+  woo-network:
+    external: true
+  chatwoot-internal:
+    driver: overlay

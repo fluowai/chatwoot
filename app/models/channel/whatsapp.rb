@@ -226,7 +226,7 @@ class Channel::Whatsapp < ApplicationRecord
   def setup_unofficial_webhook
     return unless provider_service.respond_to?(:configure_webhook)
 
-    base_url = ENV.fetch('FRONTEND_URL', 'http://localhost:3000').chomp('/')
+    base_url = ENV.fetch('INTERNAL_WEBHOOK_URL', ENV.fetch('FRONTEND_URL', 'http://localhost:3000')).chomp('/')
     webhook_url = "#{base_url}/webhooks/whatsapp/#{ERB::Util.url_encode(phone_number)}"
     provider_service.configure_webhook(webhook_url)
   end

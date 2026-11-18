@@ -46,6 +46,7 @@ class Whatsapp::Providers::EvolutionService < Whatsapp::Providers::BaseService
   end
 
   def fetch_qr_code
+    ensure_instance_exists
     url = "#{api_host}/instance/connect/#{ERB::Util.url_encode(instance_name)}"
     response = HTTParty.get(url, headers: headers, timeout: 15)
     return { error: error_message(response) } unless response.success?
@@ -61,7 +62,31 @@ class Whatsapp::Providers::EvolutionService < Whatsapp::Providers::BaseService
     { error: e.message }
   end
 
+  def ensure_instance_exists
+    state_info = connection_status
+    return true unless %w[error unreachable].include?(state_info[:state])
+
+    base_url = ENV.fetch('INTERNAL_WEBHOOK_URL', ENV.fetch('FRONTEND_URL', 'http://localhost:3000')).chomp('/')
+    webhook_url = "#{base_url}/webhooks/whatsapp/#{ERB::Util.url_encode(whatsapp_channel.phone_number)}"
+    create_body = {
+      instanceName: instance_name,
+      qrcode: true,
+      integration: 'WHATSAPP-BAILEYS',
+      webhook: {
+        url: webhook_url,
+        byEvents: false,
+        base64: true,
+        events: %w[MESSAGES_UPSERT MESSAGES_UPDATE SEND_MESSAGE CONNECTION_UPDATE]
+      }
+    }
+    HTTParty.post("#{api_host}/instance/create", headers: headers, body: create_body.to_json, timeout: 15)
+  rescue StandardError => e
+    Rails.logger.warn "[EVOLUTION] Auto-create instance skipped: #{e.message}"
+    false
+  end
+
   def configure_webhook(webhook_url)
+    ensure_instance_exists
     url = "#{api_host}/webhook/set/#{ERB::Util.url_encode(instance_name)}"
     body = {
       webhook: {

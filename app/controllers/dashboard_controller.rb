@@ -32,6 +32,7 @@ class DashboardController < ActionController::Base
     PIX_DEFAULT_KEY
     PIX_MERCHANT_NAME
     PIX_MERCHANT_CITY
+    EVOLUTION_API_HOST
   ].freeze
 
   before_action :set_application_pack

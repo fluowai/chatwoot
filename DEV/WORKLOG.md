@@ -96,3 +96,10 @@
 ### 3. Infraestrutura Docker & Portainer Self-Hosted
 - Criado `docker-compose.portainer.yaml` (stack completa com PostgreSQL `pgvector:pg16`, Redis 7, Chatwoot Rails com `AUTO_MIGRATE=true`, Sidekiq e Evolution API integrada sem dependência de arquivo `.env` em disco).
 - Atualizados `docker/entrypoints/rails.sh`, `docker-compose.production.yaml`, `.env.brazil.example` e guia `DEV/DEPLOY_PORTAINER_BRASIL.md`.
+
+### 4. Adequação da Stack Portainer para o Cluster Docker Swarm WooTech (`chatwoot.wootech.com.br`)
+- Reescrito [`docker-compose.portainer.yaml`](file:///c:/Users/paulo/chatwoot/docker-compose.portainer.yaml) no padrão exato de **Docker Swarm + Traefik** da infraestrutura WooTech:
+  - Rede externa compartilhada `woo-network` (`external: true`) + rede interna isolada `chatwoot-internal` (`driver: overlay`) para evitar qualquer colisão de DNS de Postgres/Redis no Swarm.
+  - Labels Traefik em `deploy.labels` com `traefik.swarm.network=woo-network`, `Host(\`chatwoot.wootech.com.br\`)`, `entrypoints=websecure`, `tls.certresolver=letsencrypt` e `loadbalancer.server.port=3000`.
+  - Excluído `/health` de redirecionamento SSL em `config/environments/production.rb` para que o `healthcheck` interno `wget --spider http://127.0.0.1:3000/health` funcione com `FORCE_SSL=true`.
+  - Adicionado provisionamento automático de instância na Evolution API (`ensure_instance_exists`) e roteamento interno de webhooks via `INTERNAL_WEBHOOK_URL=http://chatwoot-web:3000`.
